@@ -190,7 +190,7 @@ else:
                     dst = os.path.join("encrypted_storage", restore_file)
                     shutil.move(src, dst)
                     log_action(st.session_state.username, "Fayl Bərpası", f"{restore_file} backup-dan bərpa edildi")
-                    st.success(f"Uğurludur! '{restore_file'}' faylı uğurla bulud saxlancına bərpa olundu.")
+                    st.success(f"Uğurludur! {restore_file} faylı uğurla bulud saxlancına bərpa olundu.")
                     st.rerun()
             else:
                 st.info("Ehtiyat nüsxədə (Backup) silinmiş fayl yoxdur.")
