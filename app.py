@@ -1,12 +1,13 @@
 import streamlit as st
 import os
 import pandas as pd
+import shutil
 from cryptography.fernet import Fernet
 
 # Səhifə konfiqurasiyası
 st.set_page_config(page_title="CloudSec & Crypto Manager", page_icon="🛡️", layout="wide")
 
-# Şifrələmə açarının idarə olunması (Kriptoqrafiya üçün)
+# Şifrələmə açarının idarə olunması
 KEY_FILE = "secret.key"
 
 def load_or_create_key():
@@ -21,8 +22,9 @@ def load_or_create_key():
 
 cipher_suite = Fernet(load_or_create_key())
 
-# Qovluqların yaradılması
+# Qovluqların yaradılması (Əsas saxlanc və Ehtiyat/Bərpa saxlancı)
 os.makedirs("encrypted_storage", exist_ok=True)
+os.makedirs("backup_storage", exist_ok=True)
 LOG_FILE = "audit_logs.csv"
 
 if not os.path.exists(LOG_FILE):
@@ -40,13 +42,13 @@ def log_action(user, action, detail):
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(LOG_FILE, index=False)
 
-# Session State (Giriş statusunu yadda saxlamaq üçün)
+# Session State
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.role = None
     st.session_state.username = ""
 
-# ----------------- GİRİŞ (AUTHENTICATION) EKRANI -----------------
+# ----------------- GİRİŞ EKRANI -----------------
 if not st.session_state.logged_in:
     st.title("🔐 Təhlükəsiz Giriş Paneli (IAM & Authentication)")
     st.write("Sistemə daxil olmaq üçün müvafiq rol və giriş məlumatlarınızı daxil edin.")
@@ -73,11 +75,10 @@ if not st.session_state.logged_in:
                 st.info("💡 Test üçün:\n- İşçi: user / 123\n- Admin: admin / admin123")
 
     with col2:
-        st.info("ℹ️ **Təhlükəsizlik Qeydi:** Bu səhifə səlahiyyətsiz şəxslərin bulud saxlancına və admin panelinə girişinin qarşısını almaq üçün Authentication mexanizmi ilə qorunur.")
+        st.info("ℹ️ **Təhlükəsizlik Qeydi:** Bu səhifə səlahiyyətsiz şəxslərin bulud saxlancına girişinin qarşısını alır.")
 
-# ----------------- ƏSAS SİSTEM (GİRİŞ EDİLDİKDƏN SONRA) -----------------
+# ----------------- ƏSAS SİSTEM -----------------
 else:
-    # Sol Menyu və Çıxış düyməsi
     st.sidebar.title(f"🛡️ Xoş gəldin, {st.session_state.username}")
     st.sidebar.write(f"Rol: **{st.session_state.role}**")
     
@@ -90,7 +91,7 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.info("Bu layihə Kriptoqrafiya, Bulud Təhlükəsizliyi və İTİS prinsiplərini əhatə edir.")
 
-    # 1. İŞÇİ PANELİ (Fayl yükləmə və Kriptoqrafiya)
+    # 1. İŞÇİ PANELİ
     if st.session_state.role == "İşçi (User)":
         st.title("📁 Bulud Saxlanc Mərkəzi (Cloud Storage)")
         st.write("Buradan fayllarınızı buluda **AES** alqoritmi ilə şifrələnmiş şəkildə yükləyə bilərsiniz.")
@@ -113,56 +114,61 @@ else:
         files = os.listdir("encrypted_storage")
         if files:
             selected_file = st.selectbox("Faylı seçin:", files)
-            if st.button("Deşifrə et və Endir"):
-                file_path = os.path.join("encrypted_storage", selected_file)
-                with open(file_path, "rb") as f:
-                    encrypted_data = f.read()
-                
-                try:
-                    decrypted_data = cipher_suite.decrypt(encrypted_data)
-                    original_name = selected_file.replace(".enc", "")
-                    st.download_button(
-                        label="Orijinal Faylı Endir",
-                        data=decrypted_data,
-                        file_name=original_name
-                    )
-                    log_action(st.session_state.username, "Fayl Endirilməsi", f"{original_name} deşifrə edildi")
-                except Exception as e:
-                    st.error("Deşifrələmə xətası! Fayl bütövlüyü pozulub və ya açar uyğun gəlmir.")
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.button("Deşifrə et və Endir"):
+                    file_path = os.path.join("encrypted_storage", selected_file)
+                    with open(file_path, "rb") as f:
+                        encrypted_data = f.read()
+                    try:
+                        decrypted_data = cipher_suite.decrypt(encrypted_data)
+                        original_name = selected_file.replace(".enc", "")
+                        st.download_button(
+                            label="Orijinal Faylı Endir",
+                            data=decrypted_data,
+                            file_name=original_name
+                        )
+                        log_action(st.session_state.username, "Fayl Endirilməsi", f"{original_name} deşifrə edildi")
+                    except Exception as e:
+                        st.error("Deşifrələmə xətası!")
+            with col_b:
+                if st.button("Faylı Sil (Arxivə At)"):
+                    src = os.path.join("encrypted_storage", selected_file)
+                    dst = os.path.join("backup_storage", selected_file)
+                    shutil.move(src, dst)
+                    log_action(st.session_state.username, "Fayl Silinməsi", f"{selected_file} ehtiyat nüsxəyə daşındı")
+                    st.warning(f"'{selected_file}' buluddan silindi və ehtiyat nüsxəyə (Backup) köçürüldü!")
+                    st.rerun()
         else:
             st.info("Bulud saxlancında hələ ki fayl yoxdur.")
 
-    # 2. ADMIN PANELİ (İnformasiya Təhlükəsizliyinin İdarə Edilməsi - ISO 27001)
+    # 2. ADMIN PANELİ (ISO 27001 & Disaster Recovery)
     else:
         st.title("⚙️ İTİS & Bulud Təhlükəsizliyi İdarəetmə Paneli (Admin)")
-        st.write("Bu paneldə **ISO/IEC 27001** standartına uyğun olaraq risk qiymətləndirməsi və sistem logları izlənilir.")
+        st.write("Bu paneldə **ISO/IEC 27001** standartına uyğun risklər, loglar və bulud bərpaetmə mexanizmi idarə olunur.")
 
-        tab1, tab2 = st.tabs(["📊 Risk Menecmenti (ISO 27001)", "📜 Audit Logları"])
+        tab1, tab2, tab3 = st.tabs(["📊 Risk Menecmenti", "📜 Audit Logları", "🔄 Bulud Bərpa (Disaster Recovery)"])
 
         with tab1:
             st.subheader("Bulud Mühiti Üzrə Risk və Tədbir Matrisi")
             risk_data = {
-                "Risk №": ["R-01", "R-02", "R-03"],
+                "Risk №": ["R-01", "R-02", "R-03", "R-04"],
                 "Təhlükə / Zəiflik": [
                     "Zəif parolların istifadəsi",
                     "Şifrələnməmiş məlumat ötürülməsi",
-                    "Səlahiyyətsiz giriş cəhdləri"
+                    "Səlahiyyətsiz giriş cəhdləri",
+                    "Məlumatların səhvən silinməsi (Data Loss)"
                 ],
                 "ISO 27001 Nəzarət Tədbiri": [
                     "Mürəkkəb parol siyasətinin tətbiqi",
-                    "AES və SSL/TLS şifrələmə protokolları",
-                    "IAM (Rol əsaslı giriş nəzarəti)"
+                    "AES şifrələmə protokolları",
+                    "IAM (Rol əsaslı giriş nəzarəti)",
+                    "Avtomatik Backup və Disaster Recovery"
                 ],
-                "Status": ["Həll olundu", "Nəzarətdədir", "Aktiv"]
+                "Status": ["Həll olundu", "Nəzarətdədir", "Aktiv", "Qorunur"]
             }
             df_risk = pd.DataFrame(risk_data)
             st.dataframe(df_risk, use_container_width=True)
-
-            st.markdown("### Yeni Risk Əlavə Et")
-            new_risk = st.text_input("Risk təsviri:")
-            new_control = st.text_input("Görüləcək tədbir:")
-            if st.button("Riski Qeydə Al"):
-                st.success("Risk uğurla əlavə edildi və İTİS siyahısına salındı!")
 
         with tab2:
             st.subheader("Sistem Əməliyyatlarının Tarixçəsi (Audit Logs)")
@@ -171,3 +177,20 @@ else:
                 st.dataframe(df_logs, use_container_width=True)
             else:
                 st.info("Hələ ki log qeydi yoxdur.")
+
+        with tab3:
+            st.subheader("🔄 Bulud Ehtiyat Nüsxəsi və Məlumatların Bərpası (Backup & Restore)")
+            st.write("Admin tərəfindən silinmiş və ya itirilmiş fayllar avtomatik olaraq **Cloud Backup** qovluğunda saxlanılır. Onları istənilən vaxt bərpa edə bilərsiniz.")
+            
+            backup_files = os.listdir("backup_storage")
+            if backup_files:
+                restore_file = st.selectbox("Bərpa ediləcək faylı seçin:", backup_files)
+                if st.button("Faylı Buluda Bərpa Et (Restore)"):
+                    src = os.path.join("backup_storage", restore_file)
+                    dst = os.path.join("encrypted_storage", restore_file)
+                    shutil.move(src, dst)
+                    log_action(st.session_state.username, "Fayl Bərpası", f"{restore_file} backup-dan bərpa edildi")
+                    st.success(f"Uğurludur! '{restore_file'}' faylı uğurla bulud saxlancına bərpa olundu.")
+                    st.rerun()
+            else:
+                st.info("Ehtiyat nüsxədə (Backup) silinmiş fayl yoxdur.")
