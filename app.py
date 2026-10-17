@@ -50,8 +50,8 @@ if not os.path.exists(LOG_FILE):
     pd.DataFrame(columns=["Tarix", "İstifadəçi", "Əməliyyat", "Detal"]).to_csv(LOG_FILE, index=False)
 
 if not os.path.exists(MSG_FILE):
-    # Admin cavab sütunu da əlavə olunur
-    pd.DataFrame(columns=["ID", "Tarix", "Kimdən", "Məzmun", "Admin Cavabı"]).to_csv(MSG_FILE, index=False)
+    # Mesajlar faylına admin cavabı üçün sütun əlavə olunub
+    pd.DataFrame(columns=["ID", "Tarix", "Kimdən", "Məzmun", "AdminCavabi"]).to_csv(MSG_FILE, index=False)
 
 if not os.path.exists(INCIDENT_FILE):
     pd.DataFrame(columns=["Tarix", "İnsident Başlığı", "ISO 27001 Kateqoriya", "Status", "Cavabdeh Tədbir"]).to_csv(INCIDENT_FILE, index=False)
@@ -69,10 +69,10 @@ def send_message(user, content):
     msg_id = len(df) + 1
     new_row = pd.DataFrame({
         "ID": [msg_id],
-        "Tarix": [pd.Timestamp.now()], 
-        "Kimdən": [user], 
+        "Tarix": [pd.Timestamp.now()],
+        "Kimdən": [user],
         "Məzmun": [content],
-        "Admin Cavabı": ["Hələ cavab verilməyib"]
+        "AdminCavabi": ["Hələ ki cavab verilməyib"]
     })
     pd.concat([df, new_row], ignore_index=True).to_csv(MSG_FILE, index=False)
 
@@ -106,7 +106,7 @@ if "logged_in" not in st.session_state:
     st.session_state.role = None
     st.session_state.username = ""
 
-# ----------------- GİRİŞ VƏ QEYDİYYAT -----------------
+# ----------------- GİRİŞ VƏ QEYDİYYAT (LOGIN / SIGN UP) -----------------
 if not st.session_state.logged_in:
     st.title("🔐 Təhlükəsiz Bulud Platforması (IAM & Password Policy)")
     st.write("Sistemə daxil olun və ya mürəkkəb parol tələblərinə uyğun yeni hesab yaradın.")
@@ -180,12 +180,12 @@ else:
         st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.info("Multi-User Cloud Security & Automated Threat Protection.")
+    st.sidebar.info("Multi-User Cloud Security & Two-Way Communication System.")
 
-    # 1. İŞÇİ PANELİ (User - Mesajlarım və Admin Cavabları)
+    # 1. İŞÇİ PANELİ (User)
     if st.session_state.role == "İşçi (User)":
         st.title(f"📁 Bulud Saxlanc Mərkəzi — İstifadəçi: {st.session_state.username}")
-        st.write("Fayllarınızı təhlükəsiz şəkildə buluda yükləyin və adminlə əlaqə saxlayın.")
+        st.write("Fayllarınızı təhlükəsiz şəkildə buluda yükləyin və admin ilə əlaqə saxlayın.")
 
         uploaded_file = st.file_uploader("Buluda yükləmək üçün fayl seçin", type=["txt", "pdf", "png", "jpg", "csv", "exe", "bat", "sh"])
 
@@ -201,8 +201,10 @@ else:
                     q_path = os.path.join("quarantine_storage", f"{st.session_state.username}_{uploaded_file.name}")
                     with open(q_path, "wb") as f:
                         f.write(file_bytes)
+                    
                     log_action(st.session_state.username, "Kritik Təhlükə: Gizli Malware Aşkarlanması", f"{uploaded_file.name} arxa planda karantinə alındı")
                     add_incident(f"Gizli Malware Yüklənməsi ({st.session_state.username})", "Bütövlük və Konfidensiallıq", "Araşdırılır", "Arxa planda avtomatik karantinə keçirildi")
+                    
                     st.success(f"Uğurludur! '{uploaded_file.name}' faylı bulud saxlancına göndərildi.")
                 else:
                     encrypted_data = cipher_suite.encrypt(file_bytes)
@@ -247,53 +249,54 @@ else:
             st.info("Bulud saxlancında hələ ki fayl yoxdur.")
 
         st.markdown("---")
-        st.subheader("💬 Adminlə Əlaqə və Cavablarım")
-        msg_text = st.text_area("Adminə yeni mesaj göndər:")
+        st.subheader("💬 Adminə Müraciət və Cavabların İzlənməsi")
+        msg_text = st.text_area("Adminə yeni mesajınız:")
         if st.button("Mesajı Göndər"):
             if msg_text.strip():
                 send_message(st.session_state.username, msg_text)
                 st.success("Mesajınız adminə göndərildi!")
                 st.rerun()
 
-        # İstifadəçinin öz mesajlarını və adminin cavablarını görməsi
-        st.markdown("### Göndərdiyiniz Müraciətlər və Admin Rəyləri:")
+        # İstifadəçinin öz göndərdiyi mesajları və adminin cavablarını görməsi
+        st.markdown("### Göndərdiyiniz Müraciətlər və Admin Cavabları:")
         if os.path.exists(MSG_FILE):
             df_m = pd.read_csv(MSG_FILE)
             user_msgs = df_m[df_m["Kimdən"] == st.session_state.username]
             if not user_msgs.empty:
-                st.dataframe(user_msgs[["Tarix", "Məzmun", "Admin Cavabı"]], use_container_width=True)
+                st.dataframe(user_msgs[["Tarix", "Məzmun", "AdminCavabi"]], use_container_width=True)
             else:
-                st.info("Hələ ki göndərilmiş müraciətiniz yoxdur.")
+                st.info("Hələ ki müraciətiniz yoxdur.")
 
-    # 2. ADMIN PANELİ (Admin - İstifadəçi Mesajlarına Cavab Yazma)
+    # 2. ADMIN PANELİ (Admin - İstifadəçilərə cavab vermə imkanı ilə)
     else:
-        st.title("⚙️ İTİS & SOC Təhlükəsizlik İdarəetmə Paneli (Admin)")
-        st.write("Bütün istifadəçi əməliyyatları, insidentlər və istifadəçilərə geridönüş paneli.")
+        st.title("⚙️ İTİS & İki Tərəfli Əlaqə Paneli (Admin)")
+        st.write("İstifadəçi müraciətlərini oxuyun, onlara rəsmi cavab yazın və sistemi idarə edin.")
 
         tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
             "📊 CIA & Risk Matrisi", 
-            "👥 İstifadəçilər", 
+            "👥 Qeydiyyatda Olan İstifadəçilər", 
             "🔐 Fayl Bütövlüyü", 
-            "🚨 İnsidentlər", 
+            "🚨 Təhlükəsizlik İnsidentləri", 
             "🦠 Gizli Malware Karantini", 
             "📜 Audit Logları", 
             "🔄 Bərpa (Recovery)", 
-            "💬 İstifadəçi Mesajları & Cavablar"
+            "💬 İstifadəçi Mesajları və Cavablar"
         ])
 
         with tab1:
             st.subheader("CIA Triad və ISO 27001 Nəzarət Matrisi")
             cia_data = {
                 "CIA Komponenti": ["Konfidensiallıq", "Bütövlük", "Əlçatanlıq"],
-                "Tətbiq Olunan Texnologiya": ["AES Şifrələmə & Parol Siyasəti", "SHA-256 File Integrity & Malware Skaneri", "Cloud Backup & Disaster Recovery"],
+                "Tətbiq Olunan Texnologiya": ["AES Şifrələmə & Parol Siyasəti", "SHA-256 File Integrity Hash & Malware Skaneri", "Cloud Backup & Disaster Recovery"],
                 "Status": ["Aktiv Qorunur", "Aktiv Yoxlanılır", "Aktiv Qorunur"]
             }
             st.dataframe(pd.DataFrame(cia_data), use_container_width=True)
 
         with tab2:
-            st.subheader("👥 Qeydiyyatda Olan İstifadəçilər")
+            st.subheader("👥 Sistemdə Qeydiyyatda Olan İstifadəçilər")
             if os.path.exists(USER_FILE):
-                st.dataframe(pd.read_csv(USER_FILE)[["Username", "Role"]], use_container_width=True)
+                df_u = pd.read_csv(USER_FILE)[["Username", "Role"]]
+                st.dataframe(df_u, use_container_width=True)
 
         with tab3:
             st.subheader("🔐 Fayl Bütövlüyü (SHA-256 Hashes)")
@@ -306,7 +309,7 @@ else:
                 st.dataframe(pd.read_csv(INCIDENT_FILE), use_container_width=True)
 
         with tab5:
-            st.subheader("🦠 Gizli Malware Karantini")
+            st.subheader("🦠 Gizli Malware Karantini (Avtomatik Təcrid)")
             q_files = os.listdir("quarantine_storage")
             if q_files:
                 q_sel = st.selectbox("Karantin faylı:", q_files)
@@ -314,8 +317,8 @@ else:
                 with col_m1:
                     if st.button("Zərərli Faylı Təmizlə və Sil (Purge)"):
                         os.remove(os.path.join("quarantine_storage", q_sel))
-                        log_action(st.session_state.username, "Malware Silindi", f"{q_sel} karantindən silindi")
-                        st.success("Zərərli fayl təmizləndi!")
+                        log_action(st.session_state.username, "Malware Silindi", f"{q_sel} admin tərəfindən karantindən silindi")
+                        st.success("Zərərli fayl sistemdən təmizləndi!")
                         st.rerun()
                 with col_m2:
                     if st.button("Təhlükəsiz hesab et və Buluda At"):
@@ -328,10 +331,10 @@ else:
                             f.write(enc_data)
                         os.remove(src)
                         log_action(st.session_state.username, "Karantindən Buraxıldı", f"{q_sel} buluda köçürüldü")
-                        st.success("Fayl buluda köçürüldü!")
+                        st.success("Fayl təmiz hesab edilərək buluda köçürüldü!")
                         st.rerun()
             else:
-                st.info("Karantin qovluğu boşdur.")
+                st.info("Karantin qovluğu boşdur. Şübhəli aktivlik yoxdur.")
 
         with tab6:
             st.subheader("📜 Audit Logları")
@@ -351,26 +354,28 @@ else:
                 st.info("Backup boşdur.")
 
         with tab8:
-            st.subheader("💬 İstifadəçi Müraciətləri və Admin Geridönüşü (Feedback)")
+            st.subheader("💬 İstifadəçi Müraciətləri və Admin Cavabları")
+            st.write("İstifadəçilərin göndərdiyi mesajları seçib onlara rəsmi cavab yazın:")
             if os.path.exists(MSG_FILE):
                 df_msgs = pd.read_csv(MSG_FILE)
                 if not df_msgs.empty:
                     st.dataframe(df_msgs, use_container_width=True)
                     
-                    st.markdown("---")
-                    st.subheader("İstifadəçiyə Cavab Yaz")
+                    # Adminin mesaj seçib cavab yazması üçün interfeys
                     msg_ids = df_msgs["ID"].tolist()
                     selected_msg_id = st.selectbox("Cavab yazılacaq Mesaj ID-sini seçin:", msg_ids)
-                    admin_reply_text = st.text_input("Admin cavabını daxil edin:")
+                    admin_reply_text = st.text_area("İstifadəçiyə yazılacaq cavab:")
                     
                     if st.button("Cavabı Göndər"):
                         if admin_reply_text.strip():
-                            df_msgs.loc[df_msgs["ID"] == selected_msg_id, "Admin Cavabı"] = admin_reply_text
+                            df_msgs.loc[df_msgs["ID"] == selected_msg_id, "AdminCavabi"] = admin_reply_text
                             df_msgs.to_csv(MSG_FILE, index=False)
-                            log_action(st.session_state.username, "Admin Cavabı", f"Mesaj ID {selected_msg_id}-ə cavab yazıldı")
-                            st.success("Cavabınız istifadəçiyə uğurla göndərildi!")
+                            log_action(st.session_state.username, "Admin Cavabı", f"ID {selected_msg_id} olan mesaja cavab yazıldı")
+                            st.success("Cavab istifadəçiyə uğurla göndərildi!")
                             st.rerun()
                         else:
-                            st.error("Cavab boş ola bilməz!")
+                            st.error("Cavab mətni boş ola bilməz!")
                 else:
-                    st.info("Hələ ki heç bir mesaj yoxdur.")
+                    st.info("Hələ ki mesaj yoxdur.")
+            else:
+                st.info("Mesaj qovluğu boşdur.")
