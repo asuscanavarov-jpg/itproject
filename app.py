@@ -22,14 +22,20 @@ def load_or_create_key():
 
 cipher_suite = Fernet(load_or_create_key())
 
-# Qovluqların yaradılması (Əsas saxlanc və Ehtiyat/Bərpa saxlancı)
+# Qovluqların yaradılması
 os.makedirs("encrypted_storage", exist_ok=True)
 os.makedirs("backup_storage", exist_ok=True)
+
 LOG_FILE = "audit_logs.csv"
+MSG_FILE = "messages.csv"
 
 if not os.path.exists(LOG_FILE):
     df_init = pd.DataFrame(columns=["Tarix", "İstifadəçi", "Əməliyyat", "Detal"])
     df_init.to_csv(LOG_FILE, index=False)
+
+if not os.path.exists(MSG_FILE):
+    df_msg_init = pd.DataFrame(columns=["Tarix", "Kimdən", "Məzmun"])
+    df_msg_init.to_csv(MSG_FILE, index=False)
 
 def log_action(user, action, detail):
     df = pd.read_csv(LOG_FILE)
@@ -41,6 +47,16 @@ def log_action(user, action, detail):
     })
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(LOG_FILE, index=False)
+
+def send_message(user, content):
+    df = pd.read_csv(MSG_FILE)
+    new_row = pd.DataFrame({
+        "Tarix": [pd.Timestamp.now()],
+        "Kimdən": [user],
+        "Məzmun": [content]
+    })
+    df = pd.concat([df, new_row], ignore_index=True)
+    df.to_csv(MSG_FILE, index=False)
 
 # Session State
 if "logged_in" not in st.session_state:
@@ -75,7 +91,7 @@ if not st.session_state.logged_in:
                 st.info("💡 Test üçün:\n- İşçi: user / 123\n- Admin: admin / admin123")
 
     with col2:
-        st.info("ℹ️ **Təhlükəsizlik Qeydi:** Bu səhifə səlahiyyətsiz şəxslərin bulud saxlancına girişinin qarşısını alır.")
+        st.info("ℹ️ **Təhlükəsizlik Qeydi:** Səlahiyyətsiz girişlərin qarşısını almaq üçün IAM mexanizmi tətbiq olunub.")
 
 # ----------------- ƏSAS SİSTEM -----------------
 else:
@@ -137,17 +153,34 @@ else:
                     dst = os.path.join("backup_storage", selected_file)
                     shutil.move(src, dst)
                     log_action(st.session_state.username, "Fayl Silinməsi", f"{selected_file} ehtiyat nüsxəyə daşındı")
-                    st.warning(f"'{selected_file}' buluddan silindi və ehtiyat nüsxəyə (Backup) köçürüldü!")
+                    st.warning(f"'{selected_file}' buluddan silindi və ehtiyat nüsxəyə köçürüldü!")
                     st.rerun()
         else:
             st.info("Bulud saxlancında hələ ki fayl yoxdur.")
 
-    # 2. ADMIN PANELİ (ISO 27001 & Disaster Recovery)
+        # Admin ilə Əlaqə / Mesaj Göndərmə Bölümü
+        st.markdown("---")
+        st.subheader("💬 Adminə Müraciət və Dəstək")
+        msg_text = st.text_area("Adminə göndərmək üçün mesajınızı yazın:")
+        if st.button("Mesajı Göndər"):
+            if msg_text.strip():
+                send_message(st.session_state.username, msg_text)
+                st.success("Mesajınız adminə uğurla göndərildi!")
+            else:
+                st.error("Boş mesaj göndərmək olmaz!")
+
+    # 2. ADMIN PANELİ (ISO 27001, File Management & Messages)
     else:
         st.title("⚙️ İTİS & Bulud Təhlükəsizliyi İdarəetmə Paneli (Admin)")
-        st.write("Bu paneldə **ISO/IEC 27001** standartına uyğun risklər, loglar və bulud bərpaetmə mexanizmi idarə olunur.")
+        st.write("Bu paneldə **ISO/IEC 27001** standartına uyğun risklər, loglar, fayl idarəetməsi və istifadəçi əlaqələri idarə olunur.")
 
-        tab1, tab2, tab3 = st.tabs(["📊 Risk Menecmenti", "📜 Audit Logları", "🔄 Bulud Bərpa (Disaster Recovery)"])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "📊 Risk Menecmenti", 
+            "📜 Audit Logları", 
+            "📂 Bulud Faylları (Admin)", 
+            "🔄 Bulud Bərpa (Recovery)", 
+            "💬 İstifadəçi Mesajları"
+        ])
 
         with tab1:
             st.subheader("Bulud Mühiti Üzrə Risk və Tədbir Matrisi")
@@ -179,18 +212,43 @@ else:
                 st.info("Hələ ki log qeydi yoxdur.")
 
         with tab3:
+            st.subheader("📂 Bulud Saxlancının İdarə Edilməsi (Admin Silmə Səlahiyyəti)")
+            st.write("Admin olaraq buluddakı istənilən faylı nəzarətdə saxlaya və lazım gələrsə silib ehtiyat nüsxəyə ata bilərsiniz.")
+            admin_files = os.listdir("encrypted_storage")
+            if admin_files:
+                adm_selected = st.selectbox("İdarə ediləcək faylı seçin:", admin_files, key="admin_file_sel")
+                if st.button("Admin Səlahiyyəti ilə Faylı Sil (Arxivə At)"):
+                    src = os.path.join("encrypted_storage", adm_selected)
+                    dst = os.path.join("backup_storage", adm_selected)
+                    shutil.move(src, dst)
+                    log_action(st.session_state.username, "Admin Fayl Silinməsi", f"{adm_selected} admin tərəfindən arxivə atıldı")
+                    st.warning(f"Fayl admin tərəfindən buluddan silindi və bərpa qovluğuna daşındı!")
+                    st.rerun()
+            else:
+                st.info("Bulud saxlancında fayl yoxdur.")
+
+        with tab4:
             st.subheader("🔄 Bulud Ehtiyat Nüsxəsi və Məlumatların Bərpası (Backup & Restore)")
-            st.write("Admin tərəfindən silinmiş və ya itirilmiş fayllar avtomatik olaraq **Cloud Backup** qovluğunda saxlanılır. Onları istənilən vaxt bərpa edə bilərsiniz.")
-            
             backup_files = os.listdir("backup_storage")
             if backup_files:
-                restore_file = st.selectbox("Bərpa ediləcək faylı seçin:", backup_files)
+                restore_file = st.selectbox("Bərpa ediləcək faylı seçin:", backup_files, key="restore_sel")
                 if st.button("Faylı Buluda Bərpa Et (Restore)"):
                     src = os.path.join("backup_storage", restore_file)
                     dst = os.path.join("encrypted_storage", restore_file)
                     shutil.move(src, dst)
                     log_action(st.session_state.username, "Fayl Bərpası", f"{restore_file} backup-dan bərpa edildi")
-                    st.success(f"Uğurludur! {restore_file} faylı uğurla bulud saxlancına bərpa olundu.")
+                    st.success(f"Uğurludur! '{restore_file}' faylı bulud saxlancına bərpa olundu.")
                     st.rerun()
             else:
                 st.info("Ehtiyat nüsxədə (Backup) silinmiş fayl yoxdur.")
+
+        with tab5:
+            st.subheader("💬 İstifadəçilərdən Gələn Müraciətlər və Mesajlar")
+            if os.path.exists(MSG_FILE):
+                df_msgs = pd.read_csv(MSG_FILE)
+                if not df_msgs.empty:
+                    st.dataframe(df_msgs, use_container_width=True)
+                else:
+                    st.info("Hələ ki heç bir mesaj yoxdur.")
+            else:
+                st.info("Mesaj qovluğu boşdur.")
