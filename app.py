@@ -58,7 +58,6 @@ if not st.session_state.logged_in:
         input_pass = st.text_input("Şifrə:", type="password")
 
         if st.button("Daxil Ol"):
-            # Sınaq üçün təyin olunmuş parollar
             if login_role == "İşçi (User)" and input_user == "user" and input_pass == "123":
                 st.session_state.logged_in = True
                 st.session_state.role = "İşçi (User)"
@@ -80,7 +79,7 @@ if not st.session_state.logged_in:
 else:
     # Sol Menyu və Çıxış düyməsi
     st.sidebar.title(f"🛡️ Xoş gəldin, {st.session_state.username}")
-    st.sidebar.write(Roles: f"**{st.session_state.role}**")
+    st.sidebar.write(f"Rol: **{st.session_state.role}**")
     
     if st.sidebar.button("🚪 Sistemdən Çıxış (Logout)"):
         st.session_state.logged_in = False
