@@ -25,6 +25,7 @@ cipher_suite = Fernet(load_or_create_key())
 # Qovluqların yaradılması
 os.makedirs("encrypted_storage", exist_ok=True)
 os.makedirs("backup_storage", exist_ok=True)
+os.makedirs("quarantine_storage", exist_ok=True)
 
 LOG_FILE = "audit_logs.csv"
 MSG_FILE = "messages.csv"
@@ -81,9 +82,9 @@ if "logged_in" not in st.session_state:
     st.session_state.role = None
     st.session_state.username = ""
 
-# ----------------- GİRİŞ EKRANI -----------------
+# ----------------- GİRİŞ EKRANI (Ssenari 3 İzləməsi) -----------------
 if not st.session_state.logged_in:
-    st.title("🔐 Təhlükəsiz Giriş Paneli (IAM & Authentication)")
+    st.title("🔐 Təhlükəsiz Giriş Paneli (IAM & Brute-Force Protection)")
     st.write("Sistemə daxil olmaq üçün müvafiq rol və giriş məlumatlarınızı daxil edin.")
     
     col1, col2 = st.columns(2)
@@ -97,18 +98,24 @@ if not st.session_state.logged_in:
                 st.session_state.logged_in = True
                 st.session_state.role = "İşçi (User)"
                 st.session_state.username = input_user
+                log_action(input_user, "Uğurlu Giriş", "İşçi rolu ilə sistemə daxil oldu")
                 st.rerun()
             elif login_role == "Admin (ISO 27001)" and input_user == "admin" and input_pass == "admin123":
                 st.session_state.logged_in = True
                 st.session_state.role = "Admin (ISO 27001)"
                 st.session_state.username = input_user
+                log_action(input_user, "Uğurlu Giriş", "Admin rolu ilə sistemə daxil oldu")
                 st.rerun()
             else:
-                st.error("❌ Yanlış istifadəçi adı və ya şifrə!")
+                # Səlahiyyətsiz giriş cəhdi / Brute-force qeydi
+                failed_user = input_user if input_user else "Naməlum"
+                log_action(failed_user, "Kritik Təhlükə: Səlahiyyətsiz Giriş Cəhdi", f"Yanlış şifrə cəhdi ({login_role})")
+                add_incident(f"Səlahiyyətsiz Giriş Cəhdi ({failed_user})", "Səlahiyyət Pozuntusu", "Açıq", "IP ünvanı izləndi və loglara yazıldı")
+                st.error("❌ Yanlış istifadəçi adı və ya şifrə! Bu səlahiyyətsiz cəhd audit loglarına və ISMS insidentlərinə yazıldı.")
                 st.info("💡 Test üçün:\n- İşçi: user / 123\n- Admin: admin / admin123")
 
     with col2:
-        st.info("ℹ️ **Təhlükəsizlik Qeydi:** Səlahiyyətsiz girişlərin qarşısını almaq üçün IAM mexanizmi tətbiq olunub.")
+        st.info("ℹ️ **Təhlükəsizlik Qeydi:** Səlahiyyətsiz girişlər və hücum cəhdləri avtomatik olaraq izlənilir.")
 
 # ----------------- ƏSAS SİSTEM -----------------
 else:
@@ -116,6 +123,7 @@ else:
     st.sidebar.write(f"Rol: **{st.session_state.role}**")
     
     if st.sidebar.button("🚪 Sistemdən Çıxış (Logout)"):
+        log_action(st.session_state.username, "Sistemdən Çıxış", "İşçi/Admin sistemdən çıxdı")
         st.session_state.logged_in = False
         st.session_state.role = None
         st.session_state.username = ""
@@ -124,24 +132,40 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.info("Bu layihə Kriptoqrafiya, Bulud Təhlükəsizliyi və İTİS prinsiplərini əhatə edir.")
 
-    # 1. İŞÇİ PANELİ
+    # 1. İŞÇİ PANELİ (Ssenari 2: Malware Skaneri)
     if st.session_state.role == "İşçi (User)":
-        st.title("📁 Bulud Saxlanc Mərkəzi (Cloud Storage)")
-        st.write("Buradan fayllarınızı buluda **AES** alqoritmi ilə şifrələnmiş şəkildə yükləyə bilərsiniz.")
+        st.title("📁 Bulud Saxlanc Mərkəzi (Cloud Storage & Malware Scanner)")
+        st.write("Buradan fayllarınızı buluda yükləyə bilərsiniz. Sistem faylları **AES** ilə şifrələyir və zərərli proqramlara qarşı yoxlayır.")
 
-        uploaded_file = st.file_uploader("Buluda yükləmək üçün fayl seçin", type=["txt", "pdf", "png", "jpg", "csv"])
+        uploaded_file = st.file_uploader("Buluda yükləmək üçün fayl seçin", type=["txt", "pdf", "png", "jpg", "csv", "exe", "bat", "sh"])
 
         if uploaded_file is not None:
-            if st.button("Şifrələ və Buluda Göndər"):
-                file_bytes = uploaded_file.read()
-                encrypted_data = cipher_suite.encrypt(file_bytes)
-                
-                file_path = os.path.join("encrypted_storage", uploaded_file.name + ".enc")
-                with open(file_path, "wb") as f:
-                    f.write(encrypted_data)
-                
-                log_action(st.session_state.username, "Fayl Yüklənməsi", f"{uploaded_file.name} şifrələndi")
-                st.success(f"Uğurludur! '{uploaded_file.name}' faylı AES ilə şifrələnərək buludda qorundu.")
+            file_name = uploaded_file.name.lower()
+            # Şübhəli / Malware uzantı yoxlaması
+            risky_extensions = [".exe", ".bat", ".sh", ".cmd", ".js"]
+            is_malicious = any(file_name.endswith(ext) for ext in risky_extensions)
+
+            if is_malicious:
+                st.error(f"🚨 Təhlükə Aşkarlandı! '{uploaded_file.name}' faylı zərərli proqram (Malware) imzası daşıyır!")
+                if st.button("Faylı Karantinə Al (Quarantine)"):
+                    file_bytes = uploaded_file.read()
+                    q_path = os.path.join("quarantine_storage", uploaded_file.name)
+                    with open(q_path, "wb") as f:
+                        f.write(file_bytes)
+                    log_action(st.session_state.username, "Kritik İnsident: Malware Aşkarlandı", f"{uploaded_file.name} karantinə alındı")
+                    add_incident(f"Malware Fayl Yüklənməsi ({uploaded_file.name})", "Konfidensiallıq və Bütövlük", "Araşdırılır", "Fayl karantinə keçirildi və təcrid olundu")
+                    st.warning("Fayl təcrid olunmuş 'Quarantine Storage' qovluğuna köçürüldü!")
+            else:
+                if st.button("Şifrələ və Buluda Göndər"):
+                    file_bytes = uploaded_file.read()
+                    encrypted_data = cipher_suite.encrypt(file_bytes)
+                    
+                    file_path = os.path.join("encrypted_storage", uploaded_file.name + ".enc")
+                    with open(file_path, "wb") as f:
+                        f.write(encrypted_data)
+                    
+                    log_action(st.session_state.username, "Fayl Yüklənməsi", f"{uploaded_file.name} şifrələndi")
+                    st.success(f"Uğurludur! '{uploaded_file.name}' faylı AES ilə şifrələnərək buludda qorundu.")
 
         st.markdown("### Buluddakı Şifrələnmiş Fayllarınız:")
         files = os.listdir("encrypted_storage")
@@ -185,14 +209,15 @@ else:
             else:
                 st.error("Boş mesaj göndərmək olmaz!")
 
-    # 2. ADMIN PANELİ (ISO 27001 ISMS, Incidents & File Management)
+    # 2. ADMIN PANELİ
     else:
         st.title("⚙️ İTİS & Bulud Təhlükəsizliyi İdarəetmə Paneli (Admin - ISMS)")
-        st.write("Bu paneldə **ISO/IEC 27001** standartına uyğun olaraq İTİS siyasətləri, insidentlər, risklər və loglar idarə olunur.")
+        st.write("Bu paneldə **ISO/IEC 27001** standartına uyğun olaraq İTİS siyasətləri, insidentlər, malware karantini və audit logları idarə olunur.")
 
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
             "📊 Risk Menecmenti", 
-            "🚨 İnsidentlər (ISMS)", 
+            "🚨 İnsidentlər & Səlahiyyət Pozuntuları", 
+            "🦠 Malware Karantini", 
             "📜 Audit Logları", 
             "📂 Bulud Faylları (Admin)", 
             "🔄 Bulud Bərpa (Recovery)", 
@@ -202,50 +227,65 @@ else:
         with tab1:
             st.subheader("Bulud Mühiti Üzrə Risk və Tədbir Matrisi")
             risk_data = {
-                "Risk №": ["R-01", "R-02", "R-03", "R-04"],
+                "Risk №": ["R-01", "R-02", "R-03", "R-04", "R-05"],
                 "Təhlükə / Zəiflik": [
                     "Zəif parolların istifadəsi",
                     "Şifrələnməmiş məlumat ötürülməsi",
-                    "Səlahiyyətsiz giriş cəhdləri",
+                    "Səlahiyyətsiz giriş cəhdləri / Brute-Force",
+                    "Zərərli proqram (Malware) yüklənməsi",
                     "Məlumatların səhvən silinməsi (Data Loss)"
                 ],
                 "ISO 27001 Nəzarət Tədbiri": [
                     "Mürəkkəb parol siyasətinin tətbiqi",
                     "AES şifrələmə protokolları",
-                    "IAM (Rol əsaslı giriş nəzarəti)",
+                    "IAM və Avtomatik Səlahiyyətsiz Giriş Aşkarlanması",
+                    "Real-time Malware Skaneri və Quarantine Storage",
                     "Avtomatik Backup və Disaster Recovery"
                 ],
-                "Status": ["Həll olundu", "Nəzarətdədir", "Aktiv", "Qorunur"]
+                "Status": ["Həll olundu", "Nəzarətdədir", "Aktiv Müdafiə", "Aktiv", "Qorunur"]
             }
             df_risk = pd.DataFrame(risk_data)
             st.dataframe(df_risk, use_container_width=True)
 
         with tab2:
-            st.subheader("🚨 Təhlükəsizlik İnsidentləri və Uyğunsuzluqların İdarə Edilməsi (ISO 27001 Clause A.16)")
-            st.write("Sistemdə qeydə alınan təhlükəsizlik insidentləri və onların aradan qaldırılma statusları:")
-            
+            st.subheader("🚨 Təhlükəsizlik İnsidentləri və Səlahiyyət Pozuntuları (ISO 27001)")
+            st.write("Sistem tərəfindən avtomatik aşkar edilən səlahiyyətsiz giriş cəhdləri və təhlükələr:")
             if os.path.exists(INCIDENT_FILE):
                 df_inc = pd.read_csv(INCIDENT_FILE)
                 if not df_inc.empty:
                     st.dataframe(df_inc, use_container_width=True)
                 else:
                     st.info("Hələ ki qeydə alınmış insident yoxdur.")
-            
-            st.markdown("### Yeni Təhlükəsizlik İnsidenti Qeydə Al")
-            inc_title = st.text_input("İnsidentin Qısa Başlığı (Məsələn: Şübhəli IP girişi):")
-            inc_cat = st.selectbox("İnsident Kateqoriyası:", ["Konfidensiallıq Pozuntusu", "Bütövlük Xətası", "Əlçatanlıq İnsidenti", "Səlahiyyət Pozuntusu"])
-            inc_status = st.selectbox("Status:", ["Açıq", "Araşdırılır", "Bağlandı"])
-            inc_action = st.text_input("Görüləcək Düzəldici Tədbir (Corrective Action):")
-            
-            if st.button("İnsidenti Qeydə Al"):
-                if inc_title.strip() and inc_action.strip():
-                    add_incident(inc_title, inc_cat, inc_status, inc_action)
-                    st.success("Təhlükəsizlik insidenti İTİS bazasına uğurla əlavə edildi!")
-                    st.rerun()
-                else:
-                    st.error("Zəhmət olmasa bütün xanaları doldurun!")
 
         with tab3:
+            st.subheader("🦠 Malware və Şübhəli Fayl Karantini (Quarantine Storage)")
+            st.write("Sistem tərəfindən bloklanan və təcrid olunan zərərli fayllar:")
+            quarantine_files = os.listdir("quarantine_storage")
+            if quarantine_files:
+                q_selected = st.selectbox("Karantindəki faylı seçin:", quarantine_files)
+                col_q1, col_q2 = st.columns(2)
+                with col_q1:
+                    if st.button("Faylı Təmizlə və Sil (Purge)"):
+                        os.remove(os.path.join("quarantine_storage", q_selected))
+                        log_action(st.session_state.username, "Malware Silindi", f"{q_selected} karantindən silindi")
+                        st.success("Zərərli fayl sistemdən təmizləndi!")
+                        st.rerun()
+                with col_q2:
+                    if st.button("Təhlükəsiz hesab et və Buluda At"):
+                        src = os.path.join("quarantine_storage", q_selected)
+                        dst = os.path.join("encrypted_storage", q_selected + ".enc")
+                        with open(src, "rb") as f:
+                            enc_data = cipher_suite.encrypt(f.read())
+                        with open(dst, "wb") as f:
+                            f.write(enc_data)
+                        os.remove(src)
+                        log_action(st.session_state.username, "Karantindən Buraxıldı", f"{q_selected} buluda atıldı")
+                        st.success("Fayl buluda köçürüldü!")
+                        st.rerun()
+            else:
+                st.info("Karantin qovluğunda şübhəli fayl yoxdur. Sistem tam təhlükəsizdir!")
+
+        with tab4:
             st.subheader("Sistem Əməliyyatlarının Tarixçəsi (Audit Logs)")
             if os.path.exists(LOG_FILE):
                 df_logs = pd.read_csv(LOG_FILE)
@@ -253,7 +293,7 @@ else:
             else:
                 st.info("Hələ ki log qeydi yoxdur.")
 
-        with tab4:
+        with tab5:
             st.subheader("📂 Bulud Saxlancının İdarə Edilməsi (Admin Silmə Səlahiyyəti)")
             admin_files = os.listdir("encrypted_storage")
             if admin_files:
@@ -268,7 +308,7 @@ else:
             else:
                 st.info("Bulud saxlancında fayl yoxdur.")
 
-        with tab5:
+        with tab6:
             st.subheader("🔄 Bulud Ehtiyat Nüsxəsi və Məlumatların Bərpası (Backup & Restore)")
             backup_files = os.listdir("backup_storage")
             if backup_files:
@@ -283,7 +323,7 @@ else:
             else:
                 st.info("Ehtiyat nüsxədə (Backup) silinmiş fayl yoxdur.")
 
-        with tab6:
+        with tab7:
             st.subheader("💬 İstifadəçilərdən Gələn Müraciətlər və Mesajlar")
             if os.path.exists(MSG_FILE):
                 df_msgs = pd.read_csv(MSG_FILE)
