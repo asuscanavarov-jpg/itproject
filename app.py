@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import shutil
 import hashlib
+import re
 from cryptography.fernet import Fernet
 
 # Səhifə konfiqurasiyası
@@ -36,9 +37,8 @@ INTEGRITY_FILE = "integrity_hashes.csv"
 
 # Faylların ilkin yaradılması
 if not os.path.exists(USER_FILE):
-    # Varsayılan admin və bir işçi hesabı yaradırıq (şifrələr hash-lənmiş formada: admin123 və 123)
-    admin_pass_hash = hashlib.sha256("admin123".encode()).hexdigest()
-    user_pass_hash = hashlib.sha256("123".encode()).hexdigest()
+    admin_pass_hash = hashlib.sha256("Admin@123".encode()).hexdigest()
+    user_pass_hash = hashlib.sha256("User@123".encode()).hexdigest()
     df_users_init = pd.DataFrame({
         "Username": ["admin", "user"],
         "PasswordHash": [admin_pass_hash, user_pass_hash],
@@ -81,6 +81,18 @@ def save_file_hash(filename, username, file_bytes):
     pd.concat([df, new_row], ignore_index=True).to_csv(INTEGRITY_FILE, index=False)
     return file_hash
 
+# Parol güclülüyünü yoxlayan funksiya (ISO 27001 Password Policy)
+def check_password_strength(password):
+    if len(password) < 6:
+        return "Şifrə ən azı 6 simvoldan ibarət olmalıdır!"
+    if not re.search(r"[A-Za-z]", password):
+        return "Şifrədə mütləq hərflər olmalıdır!"
+    if not re.search(r"\d", password):
+        return "Şifrədə mütləq rəqəmlər olmalıdır!"
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return "Şifrədə mütləq xüsusi simvol (!@#$%^&* və s.) olmalıdır!"
+    return None
+
 # Session State
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -89,8 +101,8 @@ if "logged_in" not in st.session_state:
 
 # ----------------- GİRİŞ VƏ QEYDİYYAT (LOGIN / SIGN UP) -----------------
 if not st.session_state.logged_in:
-    st.title("🔐 Təhlükəsiz Bulud Platforması (IAM & Multi-User Authentication)")
-    st.write("Sistemə daxil olun və ya yeni hesab yaradaraq bulud saxlancından istifadə edin.")
+    st.title("🔐 Təhlükəsiz Bulud Platforması (IAM & Password Policy)")
+    st.write("Sistemə daxil olun və ya mürəkkəb parol tələblərinə uyğun yeni hesab yaradın.")
     
     auth_tab1, auth_tab2 = st.tabs(["🔑 Log In (Giriş)", "📝 Sign Up (Qeydiyyat)"])
 
@@ -117,17 +129,25 @@ if not st.session_state.logged_in:
                 st.error("❌ Yanlış istifadəçi adı və ya şifrə!")
 
     with auth_tab2:
-        st.subheader("Yeni İstifadəçi Hesabı Yarat")
+        st.subheader("Yeni İstifadəçi Hesabı Yarat (Güclü Parol Siyasəti)")
+        st.info("💡 **Təhlükəsizlik Qaydası:** Seçəcəyiniz şifrə ən azı 6 simvoldan ibarət olmalı, həmçinin içində **hərf, rəqəm və xüsusi simvol** (!@#$...) mütləq olmalıdır!")
+        
         new_user = st.text_input("Yeni İstifadəçi Adı Seçin:", key="signup_user")
         new_pass = st.text_input("Yeni Şifrə Seçin:", type="password", key="signup_pass")
         new_pass_confirm = st.text_input("Şifrəni Təsdiqləyin:", type="password", key="signup_pass_conf")
 
         if st.button("Qeydiyyatdan Keç"):
             df_users = pd.read_csv(USER_FILE)
+            
+            # Parol yoxlamaları
+            error_message = check_password_strength(new_pass)
+
             if not new_user.strip() or not new_pass.strip():
                 st.error("Bütün xanaları doldurun!")
             elif new_user in df_users["Username"].values:
                 st.error("Bu istifadəçi adı artıq mövcuddur! Başqa ad seçin.")
+            elif error_message:
+                st.error(f"❌ Zəif Şifrə Siyasəti: {error_message}")
             elif new_pass != new_pass_confirm:
                 st.error("Şifrələr bir-biri ilə uyğun gəlmir!")
             else:
@@ -139,7 +159,7 @@ if not st.session_state.logged_in:
                 })
                 df_users = pd.concat([df_users, new_row], ignore_index=True)
                 df_users.to_csv(USER_FILE, index=False)
-                log_action(new_user, "Yeni Qeydiyyat", "İstifadəçi uğurla qeydiyyatdan keçdi")
+                log_action(new_user, "Yeni Qeydiyyat", "İstifadəçi güclü parol ilə qeydiyyatdan keçdi")
                 st.success("🎉 Qeydiyyat uğurla tamamlandı! İndi 'Log In' səhifəsindən daxil ola bilərsiniz.")
 
 # ----------------- ƏSAS SİSTEM (GİRİŞ EDİLDİKDƏN SONRA) -----------------
@@ -155,7 +175,7 @@ else:
         st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.info("Multi-User Cloud Security & ISO 27001 Platforması.")
+    st.sidebar.info("Multi-User Cloud Security & Password Policy Platforması.")
 
     # 1. İŞÇİ PANELİ (User)
     if st.session_state.role == "İşçi (User)":
@@ -180,7 +200,6 @@ else:
                     file_bytes = uploaded_file.read()
                     encrypted_data = cipher_suite.encrypt(file_bytes)
                     
-                    # Fayl adına istifadəçi adı əlavə edirik ki, hər kəsin faylı ayrı olsun
                     stored_filename = f"{st.session_state.username}_{uploaded_file.name}.enc"
                     file_path = os.path.join("encrypted_storage", stored_filename)
                     with open(file_path, "wb") as f:
@@ -194,7 +213,6 @@ else:
 
         st.markdown("### Sizin Buluddakı Fayllarınız:")
         all_files = os.listdir("encrypted_storage")
-        # Yalnız cari istifadəçinin fayllarını göstəririk
         user_files = [f for f in all_files if f.startswith(f"{st.session_state.username}_")]
 
         if user_files:
@@ -251,16 +269,16 @@ else:
             st.subheader("CIA Triad və ISO 27001 Nəzarət Matrisi")
             cia_data = {
                 "CIA Komponenti": ["Konfidensiallıq", "Bütövlük", "Əlçatanlıq"],
-                "Tətbiq Olunan Texnologiya": ["AES Şifrələmə & SHA-256 Şifrələnmiş Parollar", "SHA-256 File Integrity Hash", "Cloud Backup & Disaster Recovery"],
+                "Tətbiq Olunan Texnologiya": ["AES Şifrələmə & Güclü Parol Siyasəti", "SHA-256 File Integrity Hash", "Cloud Backup & Disaster Recovery"],
                 "Status": ["Aktiv Qorunur", "Aktiv Yoxlanılır", "Aktiv Qorunur"]
             }
             st.dataframe(pd.DataFrame(cia_data), use_container_width=True)
 
         with tab2:
             st.subheader("👥 Sistemdə Qeydiyyatda Olan İstifadəçilər")
-            st.write("Hər bir istifadəçi fərqli hesabla daxil olur. Parollar heç vaxt açıq şəkildə saxlanılmır (Password Hashing).")
+            st.write("Parol siyasəti sayəsində bütün istifadəçilər mürəkkəb (hərf, rəqəm, simvol) şifrələrdən istifadə etməyə məcbur edilir.")
             if os.path.exists(USER_FILE):
-                df_u = pd.read_csv(USER_FILE)[["Username", "Role"]] # Şifrə hash-lərini təhlükəsizlik üçün adminə də göstərmirik!
+                df_u = pd.read_csv(USER_FILE)[["Username", "Role"]]
                 st.dataframe(df_u, use_container_width=True)
 
         with tab3:
