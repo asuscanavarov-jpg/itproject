@@ -28,6 +28,7 @@ os.makedirs("backup_storage", exist_ok=True)
 
 LOG_FILE = "audit_logs.csv"
 MSG_FILE = "messages.csv"
+INCIDENT_FILE = "incidents.csv"
 
 if not os.path.exists(LOG_FILE):
     df_init = pd.DataFrame(columns=["Tarix", "İstifadəçi", "Əməliyyat", "Detal"])
@@ -36,6 +37,10 @@ if not os.path.exists(LOG_FILE):
 if not os.path.exists(MSG_FILE):
     df_msg_init = pd.DataFrame(columns=["Tarix", "Kimdən", "Məzmun"])
     df_msg_init.to_csv(MSG_FILE, index=False)
+
+if not os.path.exists(INCIDENT_FILE):
+    df_inc_init = pd.DataFrame(columns=["Tarix", "İnsident Başlığı", "ISO 27001 Kateqoriya", "Status", "Cavabdeh Tədbir"])
+    df_inc_init.to_csv(INCIDENT_FILE, index=False)
 
 def log_action(user, action, detail):
     df = pd.read_csv(LOG_FILE)
@@ -57,6 +62,18 @@ def send_message(user, content):
     })
     df = pd.concat([df, new_row], ignore_index=True)
     df.to_csv(MSG_FILE, index=False)
+
+def add_incident(title, category, status, action):
+    df = pd.read_csv(INCIDENT_FILE)
+    new_row = pd.DataFrame({
+        "Tarix": [pd.Timestamp.now()],
+        "İnsident Başlığı": [title],
+        "ISO 27001 Kateqoriya": [category],
+        "Status": [status],
+        "Cavabdeh Tədbir": [action]
+    })
+    df = pd.concat([df, new_row], ignore_index=True)
+    df.to_csv(INCIDENT_FILE, index=False)
 
 # Session State
 if "logged_in" not in st.session_state:
@@ -158,7 +175,6 @@ else:
         else:
             st.info("Bulud saxlancında hələ ki fayl yoxdur.")
 
-        # Admin ilə Əlaqə / Mesaj Göndərmə Bölümü
         st.markdown("---")
         st.subheader("💬 Adminə Müraciət və Dəstək")
         msg_text = st.text_area("Adminə göndərmək üçün mesajınızı yazın:")
@@ -169,13 +185,14 @@ else:
             else:
                 st.error("Boş mesaj göndərmək olmaz!")
 
-    # 2. ADMIN PANELİ (ISO 27001, File Management & Messages)
+    # 2. ADMIN PANELİ (ISO 27001 ISMS, Incidents & File Management)
     else:
-        st.title("⚙️ İTİS & Bulud Təhlükəsizliyi İdarəetmə Paneli (Admin)")
-        st.write("Bu paneldə **ISO/IEC 27001** standartına uyğun risklər, loglar, fayl idarəetməsi və istifadəçi əlaqələri idarə olunur.")
+        st.title("⚙️ İTİS & Bulud Təhlükəsizliyi İdarəetmə Paneli (Admin - ISMS)")
+        st.write("Bu paneldə **ISO/IEC 27001** standartına uyğun olaraq İTİS siyasətləri, insidentlər, risklər və loglar idarə olunur.")
 
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
             "📊 Risk Menecmenti", 
+            "🚨 İnsidentlər (ISMS)", 
             "📜 Audit Logları", 
             "📂 Bulud Faylları (Admin)", 
             "🔄 Bulud Bərpa (Recovery)", 
@@ -204,6 +221,31 @@ else:
             st.dataframe(df_risk, use_container_width=True)
 
         with tab2:
+            st.subheader("🚨 Təhlükəsizlik İnsidentləri və Uyğunsuzluqların İdarə Edilməsi (ISO 27001 Clause A.16)")
+            st.write("Sistemdə qeydə alınan təhlükəsizlik insidentləri və onların aradan qaldırılma statusları:")
+            
+            if os.path.exists(INCIDENT_FILE):
+                df_inc = pd.read_csv(INCIDENT_FILE)
+                if not df_inc.empty:
+                    st.dataframe(df_inc, use_container_width=True)
+                else:
+                    st.info("Hələ ki qeydə alınmış insident yoxdur.")
+            
+            st.markdown("### Yeni Təhlükəsizlik İnsidenti Qeydə Al")
+            inc_title = st.text_input("İnsidentin Qısa Başlığı (Məsələn: Şübhəli IP girişi):")
+            inc_cat = st.selectbox("İnsident Kateqoriyası:", ["Konfidensiallıq Pozuntusu", "Bütövlük Xətası", "Əlçatanlıq İnsidenti", "Səlahiyyət Pozuntusu"])
+            inc_status = st.selectbox("Status:", ["Açıq", "Araşdırılır", "Bağlandı"])
+            inc_action = st.text_input("Görüləcək Düzəldici Tədbir (Corrective Action):")
+            
+            if st.button("İnsidenti Qeydə Al"):
+                if inc_title.strip() and inc_action.strip():
+                    add_incident(inc_title, inc_cat, inc_status, inc_action)
+                    st.success("Təhlükəsizlik insidenti İTİS bazasına uğurla əlavə edildi!")
+                    st.rerun()
+                else:
+                    st.error("Zəhmət olmasa bütün xanaları doldurun!")
+
+        with tab3:
             st.subheader("Sistem Əməliyyatlarının Tarixçəsi (Audit Logs)")
             if os.path.exists(LOG_FILE):
                 df_logs = pd.read_csv(LOG_FILE)
@@ -211,9 +253,8 @@ else:
             else:
                 st.info("Hələ ki log qeydi yoxdur.")
 
-        with tab3:
+        with tab4:
             st.subheader("📂 Bulud Saxlancının İdarə Edilməsi (Admin Silmə Səlahiyyəti)")
-            st.write("Admin olaraq buluddakı istənilən faylı nəzarətdə saxlaya və lazım gələrsə silib ehtiyat nüsxəyə ata bilərsiniz.")
             admin_files = os.listdir("encrypted_storage")
             if admin_files:
                 adm_selected = st.selectbox("İdarə ediləcək faylı seçin:", admin_files, key="admin_file_sel")
@@ -227,7 +268,7 @@ else:
             else:
                 st.info("Bulud saxlancında fayl yoxdur.")
 
-        with tab4:
+        with tab5:
             st.subheader("🔄 Bulud Ehtiyat Nüsxəsi və Məlumatların Bərpası (Backup & Restore)")
             backup_files = os.listdir("backup_storage")
             if backup_files:
@@ -242,7 +283,7 @@ else:
             else:
                 st.info("Ehtiyat nüsxədə (Backup) silinmiş fayl yoxdur.")
 
-        with tab5:
+        with tab6:
             st.subheader("💬 İstifadəçilərdən Gələn Müraciətlər və Mesajlar")
             if os.path.exists(MSG_FILE):
                 df_msgs = pd.read_csv(MSG_FILE)
