@@ -35,7 +35,7 @@ MSG_FILE = "messages.csv"
 INCIDENT_FILE = "incidents.csv"
 INTEGRITY_FILE = "integrity_hashes.csv"
 
-# Faylların ilkin yaradılması
+# Faylların ilkin yaradılması və struktur yoxlanılması
 if not os.path.exists(USER_FILE):
     admin_pass_hash = hashlib.sha256("Admin@123".encode()).hexdigest()
     user_pass_hash = hashlib.sha256("User@123".encode()).hexdigest()
@@ -49,8 +49,15 @@ if not os.path.exists(USER_FILE):
 if not os.path.exists(LOG_FILE):
     pd.DataFrame(columns=["Tarix", "İstifadəçi", "Əməliyyat", "Detal"]).to_csv(LOG_FILE, index=False)
 
-if not os.path.exists(MSG_FILE):
-    # Mesajlar faylına admin cavabı üçün sütun əlavə olunub
+# Mesajlar faylını təhlükəsiz yoxlama və yaratma (KeyError qarşısını almaq üçün)
+if os.path.exists(MSG_FILE):
+    df_msg_check = pd.read_csv(MSG_FILE)
+    if "ID" not in df_msg_check.columns:
+        df_msg_check.insert(0, "ID", range(1, len(df_msg_check) + 1))
+    if "AdminCavabi" not in df_msg_check.columns:
+        df_msg_check["AdminCavabi"] = "Hələ ki cavab verilməyib"
+    df_msg_check.to_csv(MSG_FILE, index=False)
+else:
     pd.DataFrame(columns=["ID", "Tarix", "Kimdən", "Məzmun", "AdminCavabi"]).to_csv(MSG_FILE, index=False)
 
 if not os.path.exists(INCIDENT_FILE):
@@ -66,7 +73,7 @@ def log_action(user, action, detail):
 
 def send_message(user, content):
     df = pd.read_csv(MSG_FILE)
-    msg_id = len(df) + 1
+    msg_id = len(df) + 1 if not df.empty else 1
     new_row = pd.DataFrame({
         "ID": [msg_id],
         "Tarix": [pd.Timestamp.now()],
@@ -257,7 +264,6 @@ else:
                 st.success("Mesajınız adminə göndərildi!")
                 st.rerun()
 
-        # İstifadəçinin öz göndərdiyi mesajları və adminin cavablarını görməsi
         st.markdown("### Göndərdiyiniz Müraciətlər və Admin Cavabları:")
         if os.path.exists(MSG_FILE):
             df_m = pd.read_csv(MSG_FILE)
@@ -267,7 +273,7 @@ else:
             else:
                 st.info("Hələ ki müraciətiniz yoxdur.")
 
-    # 2. ADMIN PANELİ (Admin - İstifadəçilərə cavab vermə imkanı ilə)
+    # 2. ADMIN PANELİ (Admin)
     else:
         st.title("⚙️ İTİS & İki Tərəfli Əlaqə Paneli (Admin)")
         st.write("İstifadəçi müraciətlərini oxuyun, onlara rəsmi cavab yazın və sistemi idarə edin.")
@@ -361,7 +367,6 @@ else:
                 if not df_msgs.empty:
                     st.dataframe(df_msgs, use_container_width=True)
                     
-                    # Adminin mesaj seçib cavab yazması üçün interfeys
                     msg_ids = df_msgs["ID"].tolist()
                     selected_msg_id = st.selectbox("Cavab yazılacaq Mesaj ID-sini seçin:", msg_ids)
                     admin_reply_text = st.text_area("İstifadəçiyə yazılacaq cavab:")
