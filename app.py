@@ -81,7 +81,6 @@ def save_file_hash(filename, username, file_bytes):
     pd.concat([df, new_row], ignore_index=True).to_csv(INTEGRITY_FILE, index=False)
     return file_hash
 
-# Parol güclülüyünü yoxlayan funksiya (ISO 27001 Password Policy)
 def check_password_strength(password):
     if len(password) < 6:
         return "Şifrə ən azı 6 simvoldan ibarət olmalıdır!"
@@ -130,7 +129,7 @@ if not st.session_state.logged_in:
 
     with auth_tab2:
         st.subheader("Yeni İstifadəçi Hesabı Yarat (Güclü Parol Siyasəti)")
-        st.info("💡 **Təhlükəsizlik Qaydası:** Seçəcəyiniz şifrə ən azı 6 simvoldan ibarət olmalı, həmçinin içində **hərf, rəqəm və xüsusi simvol** (!@#$...) mütləq olmalıdır!")
+        st.info("💡 **Təhlükəsizlik Qaydası:** Şifrə ən azı 6 simvoldan ibarət olmalı, həmçinin içində **hərf, rəqəm və xüsusi simvol** (!@#$...) mütləq olmalıdır!")
         
         new_user = st.text_input("Yeni İstifadəçi Adı Seçin:", key="signup_user")
         new_pass = st.text_input("Yeni Şifrə Seçin:", type="password", key="signup_pass")
@@ -138,8 +137,6 @@ if not st.session_state.logged_in:
 
         if st.button("Qeydiyyatdan Keç"):
             df_users = pd.read_csv(USER_FILE)
-            
-            # Parol yoxlamaları
             error_message = check_password_strength(new_pass)
 
             if not new_user.strip() or not new_pass.strip():
@@ -162,7 +159,7 @@ if not st.session_state.logged_in:
                 log_action(new_user, "Yeni Qeydiyyat", "İstifadəçi güclü parol ilə qeydiyyatdan keçdi")
                 st.success("🎉 Qeydiyyat uğurla tamamlandı! İndi 'Log In' səhifəsindən daxil ola bilərsiniz.")
 
-# ----------------- ƏSAS SİSTEM (GİRİŞ EDİLDİKDƏN SONRA) -----------------
+# ----------------- ƏSAS SİSTEM -----------------
 else:
     st.sidebar.title(f"🛡️ Xoş gəldin, {st.session_state.username}")
     st.sidebar.write(f"Rol: **{st.session_state.role}**")
@@ -175,40 +172,46 @@ else:
         st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.info("Multi-User Cloud Security & Password Policy Platforması.")
+    st.sidebar.info("Multi-User Cloud Security & Automated Threat Protection.")
 
-    # 1. İŞÇİ PANELİ (User)
+    # 1. İŞÇİ PANELİ (User - Arxa planda səssiz Malware Skaneri)
     if st.session_state.role == "İşçi (User)":
         st.title(f"📁 Bulud Saxlanc Mərkəzi — İstifadəçi: {st.session_state.username}")
-        st.write("Burada yalnız sizin öz fayllarınız saxlanılır. Fayllarınız AES ilə şifrələnir və SHA-256 ilə qorunur.")
+        st.write("Fayllarınızı təhlükəsiz şəkildə buluda yükləyin. Sistem məlumatlarınızı qoruyur.")
 
-        uploaded_file = st.file_uploader("Buluda yükləmək üçün fayl seçin", type=["txt", "pdf", "png", "jpg", "csv", "exe", "bat"])
+        uploaded_file = st.file_uploader("Buluda yükləmək üçün fayl seçin", type=["txt", "pdf", "png", "jpg", "csv", "exe", "bat", "sh"])
 
         if uploaded_file is not None:
-            file_name = uploaded_file.name.lower()
-            if any(file_name.endswith(ext) for ext in [".exe", ".bat", ".sh", ".cmd"]):
-                st.error(f"🚨 Təhlükə Aşkarlandı! '{uploaded_file.name}' zərərli proqram (Malware) imzası daşıyır.")
-                if st.button("Faylı Karantinə Al"):
-                    file_bytes = uploaded_file.read()
-                    with open(os.path.join("quarantine_storage", f"{st.session_state.username}_{uploaded_file.name}"), "wb") as f:
+            if st.button("Buluda Göndər"):
+                file_bytes = uploaded_file.read()
+                file_name = uploaded_file.name.lower()
+                
+                # Zərərli proqram (Malware) yoxlaması - İstifadəçinin xəbəri yoxdur (Arxa planda işləyir)
+                risky_extensions = [".exe", ".bat", ".sh", ".cmd", ".js"]
+                is_malicious = any(file_name.endswith(ext) for ext in risky_extensions)
+
+                if is_malicious:
+                    # İstifadəçiyə hər şey normal kimi göstərilir (Fake Success)
+                    q_path = os.path.join("quarantine_storage", f"{st.session_state.username}_{uploaded_file.name}")
+                    with open(q_path, "wb") as f:
                         f.write(file_bytes)
-                    log_action(st.session_state.username, "Malware Aşkarlandı", f"{uploaded_file.name} karantinə atıldı")
-                    add_incident(f"Malware Yüklənməsi ({st.session_state.username})", "Bütövlük Pozuntusu", "Araşdırılır", "Karantinə alındı")
-                    st.warning("Fayl karantin qovluğuna köçürüldü!")
-            else:
-                if st.button("Şifrələ, Hash-lə və Buluda Göndər"):
-                    file_bytes = uploaded_file.read()
-                    encrypted_data = cipher_suite.encrypt(file_bytes)
                     
+                    # Amma arxa planda SOC / Admin üçün kritik insident kimi qeydə alınır
+                    log_action(st.session_state.username, "Kritik Təhlükə: Gizli Malware Aşkarlanması", f"{uploaded_file.name} arxa planda karantinə alındı")
+                    add_incident(f"Gizli Malware Yüklənməsi ({st.session_state.username})", "Bütövlük və Konfidensiallıq", "Araşdırılır", "Arxa planda avtomatik karantinə keçirildi")
+                    
+                    st.success(f"Uğurludur! '{uploaded_file.name}' faylı bulud saxlancına göndərildi.")
+                else:
+                    # Təmiz fayl AES ilə şifrələnir
+                    encrypted_data = cipher_suite.encrypt(file_bytes)
                     stored_filename = f"{st.session_state.username}_{uploaded_file.name}.enc"
                     file_path = os.path.join("encrypted_storage", stored_filename)
                     with open(file_path, "wb") as f:
                         f.write(encrypted_data)
                     
                     file_hash = save_file_hash(uploaded_file.name, st.session_state.username, file_bytes)
-                    
                     log_action(st.session_state.username, "Fayl Yüklənməsi", f"{uploaded_file.name} şifrələndi")
-                    st.success(f"Uğurludur! Faylınız şifrələnərək buluda yükləndi.")
+                    st.success(f"Uğurludur! Faylınız AES ilə şifrələnərək buluda yükləndi.")
                     st.code(f"SHA-256 Bütövlük İzi: {file_hash}")
 
         st.markdown("### Sizin Buluddakı Fayllarınız:")
@@ -249,17 +252,17 @@ else:
                 send_message(st.session_state.username, msg_text)
                 st.success("Mesajınız adminə göndərildi!")
 
-    # 2. ADMIN PANELİ (Admin)
+    # 2. ADMIN PANELİ (Admin - Gizli təhlükələri görən mərkəz)
     else:
-        st.title("⚙️ İTİS & Multi-User İdarəetmə Paneli (Admin)")
-        st.write("Bütün istifadəçilərin hesablama mühiti, təhlükəsizlik logları və insidentlər.")
+        st.title("⚙️ İTİS & SOC Təhlükəsizlik İdarəetmə Paneli (Admin)")
+        st.write("İstifadəçilərin arxa planda həyata keçirdiyi əməliyyatlar, avtomatik karantinə alınan malware faylları və insidentlər.")
 
         tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
             "📊 CIA & Risk Matrisi", 
             "👥 Qeydiyyatda Olan İstifadəçilər", 
             "🔐 Fayl Bütövlüyü", 
-            "🚨 İnsidentlər", 
-            "🦠 Malware Karantini", 
+            "🚨 Təhlükəsizlik İnsidentləri", 
+            "🦠 Gizli Malware Karantini", 
             "📜 Audit Logları", 
             "🔄 Bərpa (Recovery)", 
             "💬 İstifadəçi Mesajları"
@@ -269,14 +272,13 @@ else:
             st.subheader("CIA Triad və ISO 27001 Nəzarət Matrisi")
             cia_data = {
                 "CIA Komponenti": ["Konfidensiallıq", "Bütövlük", "Əlçatanlıq"],
-                "Tətbiq Olunan Texnologiya": ["AES Şifrələmə & Güclü Parol Siyasəti", "SHA-256 File Integrity Hash", "Cloud Backup & Disaster Recovery"],
+                "Tətbiq Olunan Texnologiya": ["AES Şifrələmə & Parol Siyasəti", "SHA-256 File Integrity Hash & Arxa Plan Malware Skaneri", "Cloud Backup & Disaster Recovery"],
                 "Status": ["Aktiv Qorunur", "Aktiv Yoxlanılır", "Aktiv Qorunur"]
             }
             st.dataframe(pd.DataFrame(cia_data), use_container_width=True)
 
         with tab2:
             st.subheader("👥 Sistemdə Qeydiyyatda Olan İstifadəçilər")
-            st.write("Parol siyasəti sayəsində bütün istifadəçilər mürəkkəb (hərf, rəqəm, simvol) şifrələrdən istifadə etməyə məcbur edilir.")
             if os.path.exists(USER_FILE):
                 df_u = pd.read_csv(USER_FILE)[["Username", "Role"]]
                 st.dataframe(df_u, use_container_width=True)
@@ -287,21 +289,39 @@ else:
                 st.dataframe(pd.read_csv(INTEGRITY_FILE), use_container_width=True)
 
         with tab4:
-            st.subheader("🚨 Təhlükəsizlik İnsidentləri")
+            st.subheader("🚨 Təhlükəsizlik İnsidentləri (SOC)")
             if os.path.exists(INCIDENT_FILE):
                 st.dataframe(pd.read_csv(INCIDENT_FILE), use_container_width=True)
 
         with tab5:
-            st.subheader("🦠 Malware Karantini")
+            st.subheader("🦠 Gizli Malware Karantini (Avtomatik Təcrid)")
+            st.write("İstifadəçilərin xəbəri olmadan arxa planda sistem tərəfindən tutulub karantinə atılan zərərli fayllar:")
             q_files = os.listdir("quarantine_storage")
             if q_files:
                 q_sel = st.selectbox("Karantin faylı:", q_files)
-                if st.button("Faylı Təmizlə və Sil"):
-                    os.remove(os.path.join("quarantine_storage", q_sel))
-                    st.success("Zərərli fayl silindi!")
-                    st.rerun()
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    if st.button("Zərərli Faylı Təmizlə və Sil (Purge)"):
+                        os.remove(os.path.join("quarantine_storage", q_sel))
+                        log_action(st.session_state.username, "Malware Silindi", f"{q_sel} admin tərəfindən karantindən silindi")
+                        st.success("Zərərli fayl sistemdən təmizləndi!")
+                        st.rerun()
+                with col_m2:
+                    if st.button("Təhlükəsiz hesab et və Buluda At"):
+                        src = os.path.join("quarantine_storage", q_sel)
+                        # Fayl adındakı istifadəçi adını ayırıb təmiz faylı buluda atırıq
+                        clean_name = q_sel.split("_", 1)[1] if "_" in q_sel else q_sel
+                        dst = os.path.join("encrypted_storage", f"{clean_name}.enc")
+                        with open(src, "rb") as f:
+                            enc_data = cipher_suite.encrypt(f.read())
+                        with open(dst, "wb") as f:
+                            f.write(enc_data)
+                        os.remove(src)
+                        log_action(st.session_state.username, "Karantindən Buraxıldı", f"{q_sel} buluda köçürüldü")
+                        st.success("Fayl təmiz hesab edilərək buluda köçürüldü!")
+                        st.rerun()
             else:
-                st.info("Karantin qovluğu boşdur.")
+                st.info("Karantin qovluğu boşdur. Şübhəli aktivlik yoxdur.")
 
         with tab6:
             st.subheader("📜 Audit Logları")
