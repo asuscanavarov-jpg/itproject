@@ -141,7 +141,7 @@ if not st.session_state.logged_in:
                 # Bloklanıb-bloklanmadığını yoxlayırıq
                 user_status = user_row.iloc[0]["Status"]
                 if user_status == "Banned":
-                    st.error("❌ Hesabınız təhlükəsizlik siyasətini pozduğuna görə BLOKLANIB (Banned)!")
+                    st.error("❌ Hesabınız təhlükəsizlik siyasətini pozduğuna görə bloklanıb (Banned).")
                 else:
                     st.session_state.logged_in = True
                     st.session_state.role = user_row.iloc[0]["Role"]
@@ -151,14 +151,14 @@ if not st.session_state.logged_in:
             else:
                 log_action(input_user if input_user else "Naməlum", "Kritik Təhlükə: Səlahiyyətsiz Giriş Cəhdi", f"Yanlış şifrə")
                 add_incident(f"Səlahiyyətsiz Giriş Cəhdi ({input_user})", "Səlahiyyət Pozuntusu", "Açıq", "IP izləndi və loglandı")
-                st.error("❌ Yanlış istifadəçi adı və ya şifrə!")
+                st.error("❌ İstifadəçi adı və ya şifrə yanlışdır!")
 
     with auth_tab2:
         st.subheader("Yeni İstifadəçi Hesabı Yarat")
-        st.info("💡 Şifrə ən azı 6 simvoldan ibarət olmalı, hərf, rəqəm və xüsusi simvol (!@#$...) içerməlidir!")
+        st.info("💡 Şifrədə ən azı 6 simvol, hərf, rəqəm və xüsusi simvol (!@#$...) olmalıdır!")
         
-        new_user = st.text_input("Yeni İstifadəçi Adı Seçin:", key="signup_user")
-        new_pass = st.text_input("Yeni Şifrə Seçin:", type="password", key="signup_pass")
+        new_user = st.text_input("Yeni İstifadəçi Adı:", key="signup_user")
+        new_pass = st.text_input("Yeni Şifrə:", type="password", key="signup_pass")
         new_pass_confirm = st.text_input("Şifrəni Təsdiqləyin:", type="password", key="signup_pass_conf")
 
         if st.button("Qeydiyyatdan Keç"):
