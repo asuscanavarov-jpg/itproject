@@ -7,7 +7,7 @@ import re
 from cryptography.fernet import Fernet
 
 # Səhifə konfiqurasiyası
-st.set_page_config(page_title="Your Sunny Cloud", page_icon="🌤️", layout="wide")
+st.set_page_config(page_title="Sunny Cloud", page_icon="🌤️", layout="wide")
 
 # Şifrələmə açarının idarə olunması
 KEY_FILE = "secret.key"
