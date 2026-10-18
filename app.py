@@ -202,8 +202,8 @@ else:
 
     # 1. İŞÇİ PANELİ
     if st.session_state.role == "İşçi (User)":
-        st.title(f"📁 Bulud Saxlanc Mərkəzi — İstifadəçi: {st.session_state.username}")
-        st.write("Fayllarınızı yükləyin. Diqqət: Eyni faylı 5 dəfədən çox yükləmək spam/hücum kimi qiymətləndirilir və hesabınız bloklana bilər!")
+        st.title(f"📁 Bulud Fayl Saxlama Mərkəzi — İstifadəçi: {st.session_state.username}")
+        st.write("Fayllarınızı yükləyin. Diqqət: Spam zamanı hesabınız bloklana bilər.")
 
         uploaded_file = st.file_uploader("Buluda yükləmək üçün fayl seçin", type=["txt", "pdf", "png", "jpg", "csv", "exe", "bat", "sh"])
 
