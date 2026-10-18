@@ -60,14 +60,14 @@ if os.path.exists(MSG_FILE):
     df_msg_check = pd.read_csv(MSG_FILE)
     if "ID" not in df_msg_check.columns:
         df_msg_check.insert(0, "ID", range(1, len(df_msg_check) + 1))
-    if "AdminCavabi" not in df_msg_check.columns:
-        df_msg_check["AdminCavabi"] = "Hələ ki cavab verilməyib"
+    if "AdminCavabı" not in df_msg_check.columns:
+        df_msg_check["AdminCavabı"] = "Hələ ki cavab verilməyib"
     df_msg_check.to_csv(MSG_FILE, index=False)
 else:
-    pd.DataFrame(columns=["ID", "Tarix", "Kimdən", "Məzmun", "AdminCavabi"]).to_csv(MSG_FILE, index=False)
+    pd.DataFrame(columns=["ID", "Tarix", "Kimdən", "Məzmun", "AdminCavabı"]).to_csv(MSG_FILE, index=False)
 
 if not os.path.exists(INCIDENT_FILE):
-    pd.DataFrame(columns=["Tarix", "İnsident Başlığı", "ISO 27001 Kateqoriya", "Status", "Cavabdeh Tədbir"]).to_csv(INCIDENT_FILE, index=False)
+    pd.DataFrame(columns=["Tarix", "İnsident Başlığı", "ISO 27001 Kateqoriya", "Status", "Tədbir"]).to_csv(INCIDENT_FILE, index=False)
 
 if not os.path.exists(INTEGRITY_FILE):
     pd.DataFrame(columns=["Fayl Adı", "İstifadəçi", "SHA-256 Hash"]).to_csv(INTEGRITY_FILE, index=False)
@@ -85,13 +85,13 @@ def send_message(user, content):
         "Tarix": [pd.Timestamp.now()],
         "Kimdən": [user],
         "Məzmun": [content],
-        "AdminCavabi": ["Hələ ki cavab verilməyib"]
+        "AdminCavabı": ["Hələ ki cavab verilməyib"]
     })
     pd.concat([df, new_row], ignore_index=True).to_csv(MSG_FILE, index=False)
 
 def add_incident(title, category, status, action):
     df = pd.read_csv(INCIDENT_FILE)
-    new_row = pd.DataFrame({"Tarix": [pd.Timestamp.now()], "İnsident Başlığı": [title], "ISO 27001 Kateqoriya": [category], "Status": [status], "Cavabdeh Tədbir": [action]})
+    new_row = pd.DataFrame({"Tarix": [pd.Timestamp.now()], "İnsident Başlığı": [title], "ISO 27001 Kateqoriya": [category], "Status": [status], "Tədbir": [action]})
     pd.concat([df, new_row], ignore_index=True).to_csv(INCIDENT_FILE, index=False)
 
 def save_file_hash(filename, username, file_bytes):
@@ -121,8 +121,8 @@ if "logged_in" not in st.session_state:
 
 # ----------------- GİRİŞ VƏ QEYDİYYAT -----------------
 if not st.session_state.logged_in:
-    st.title("🔐 Təhlükəsiz Bulud Platforması (IAM & Anti-Spam)")
-    st.write("Sistemə daxil olun və ya mürəkkəb parol tələblərinə uyğun yeni hesab yaradın.")
+    st.title("🌤️Sunny Cloud Platforması")
+    st.write("Mövcud hesab yoxdur? Qeydiyyatdan keçin.")
     
     auth_tab1, auth_tab2 = st.tabs(["🔑 Log In (Giriş)", "📝 Sign Up (Qeydiyyat)"])
 
@@ -141,7 +141,7 @@ if not st.session_state.logged_in:
                 # Bloklanıb-bloklanmadığını yoxlayırıq
                 user_status = user_row.iloc[0]["Status"]
                 if user_status == "Banned":
-                    st.error("❌ Hesabınız spam və ya təhlükəsizlik siyasətini pozduğuna görə BLOKLANIB (Banned)!")
+                    st.error("❌ Hesabınız təhlükəsizlik siyasətini pozduğuna görə BLOKLANIB (Banned)!")
                 else:
                     st.session_state.logged_in = True
                     st.session_state.role = user_row.iloc[0]["Role"]
@@ -349,7 +349,7 @@ else:
             q_files = os.listdir("quarantine_storage")
             if q_files:
                 q_sel = st.selectbox("Karantin faylı:", q_files)
-                if st.button("Faylı Təmizlə və Sil"):
+                if st.button("Faylı Sil"):
                     os.remove(os.path.join("quarantine_storage", q_sel))
                     st.success("Silindi!")
                     st.rerun()
