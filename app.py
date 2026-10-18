@@ -305,18 +305,18 @@ else:
 
     # 2. ADMIN PANELİ
     else:
-        st.title("⚙️ İTİS & Anti-Spam İdarəetmə Paneli (Admin)")
-        st.write("Spam edən və ya bloklanan istifadəçiləri idarə edin.")
+        st.title("⚙️ İTİS & Anti-Spam İdarəetmə Paneli (ADMİN)")
+        st.write("İstifadəçiləri, fayılları və təhdidləri idarə edin.")
 
         tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
             "📊 CIA & Risk Matrisi", 
             "👥 Qeydiyyatda Olan İstifadəçilər", 
-            "🔐 Fayl Bütövlüyü", 
+            "📂 Fayllar", 
             "🚨 Təhlükəsizlik İnsidentləri", 
             "🦠 Gizli Malware Karantini", 
             "📜 Audit Logları", 
             "🔄 Bərpa (Recovery)", 
-            "💬 Mesajlar və Cavablar"
+            "💬 Feedback"
         ])
 
         with tab1:
@@ -324,23 +324,23 @@ else:
             cia_data = {
                 "CIA Komponenti": ["Konfidensiallıq", "Bütövlük", "Əlçatanlıq (Anti-Spam / DoS)"],
                 "Tətbiq Olunan Texnologiya": ["AES Şifrələmə", "SHA-256 & Malware Skaneri", "Rate Limiting & Otomatik Account Banning"],
-                "Status": ["Aktiv", "Aktiv", "Aktiv Qorunur"]
+                "Status": ["Aktiv", "Aktiv", "Aktiv"]
             }
             st.dataframe(pd.DataFrame(cia_data), use_container_width=True)
 
         with tab2:
-            st.subheader("👥 İstifadəçilər və Statusları (Banned / Active)")
+            st.subheader("👥 İstifadəçi Statusları")
             if os.path.exists(USER_FILE):
                 df_u = pd.read_csv(USER_FILE)[["Username", "Role", "Status"]]
                 st.dataframe(df_u, use_container_width=True)
 
         with tab3:
-            st.subheader("🔐 Fayl Bütövlüyü (SHA-256)")
+            st.subheader("📂 Fayllar və İstifadəçilər")
             if os.path.exists(INTEGRITY_FILE):
                 st.dataframe(pd.read_csv(INTEGRITY_FILE), use_container_width=True)
 
         with tab4:
-            st.subheader("🚨 Təhlükəsizlik İnsidentləri (Spam / DoS / Brute-Force)")
+            st.subheader("🚨 Təhlükəsizlik İnsidentləri")
             if os.path.exists(INCIDENT_FILE):
                 st.dataframe(pd.read_csv(INCIDENT_FILE), use_container_width=True)
 
@@ -365,7 +365,7 @@ else:
             st.subheader("🔄 Bərpa (Disaster Recovery)")
             b_files = os.listdir("backup_storage")
             if b_files:
-                b_sel = st.selectbox("Bərpa ediləcək:", b_files, key="b_f")
+                b_sel = st.selectbox("Bərpa ediləcək fayıllar:", b_files, key="b_f")
                 if st.button("Faylı Bərpa Et"):
                     shutil.move(os.path.join("backup_storage", b_sel), os.path.join("encrypted_storage", b_sel))
                     st.success("Bərpa olundu!")
@@ -381,10 +381,10 @@ else:
                     st.dataframe(df_msgs, use_container_width=True)
                     msg_ids = df_msgs["ID"].tolist()
                     selected_msg_id = st.selectbox("Mesaj ID seçin:", msg_ids)
-                    admin_reply_text = st.text_area("Cavab yazın:")
+                    admin_reply_text = st.text_area("Cavab:")
                     if st.button("Cavabı Göndər"):
                         if admin_reply_text.strip():
-                            df_msgs.loc[df_msgs["ID"] == selected_msg_id, "AdminCavabi"] = admin_reply_text
+                            df_msgs.loc[df_msgs["ID"] == selected_msg_id, "AdminCavabı"] = admin_reply_text
                             df_msgs.to_csv(MSG_FILE, index=False)
                             st.success("Göndərildi!")
                             st.rerun()
