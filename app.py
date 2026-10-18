@@ -256,7 +256,7 @@ else:
                     st.success("Uğurludur! Fayl AES ilə şifrələnərək buluda yükləndi.")
                     st.code(f"SHA-256 İzi: {file_hash}")
 
-        st.markdown("### Sizin Buluddakı Fayllarınız:")
+        st.markdown("### Buluddakı Fayllarınız:")
         all_files = os.listdir("encrypted_storage")
         user_files = [f for f in all_files if f.startswith(f"{st.session_state.username}_")]
 
@@ -276,12 +276,12 @@ else:
                     except Exception as e:
                         st.error("Deşifrələmə xətası!")
             with col_b:
-                if st.button("Faylı Sil (Arxivə At)"):
+                if st.button("Faylı Sil"):
                     src = os.path.join("encrypted_storage", selected_file)
                     dst = os.path.join("backup_storage", selected_file)
                     shutil.move(src, dst)
                     log_action(st.session_state.username, "Fayl Silinməsi", f"{selected_file} arxivə daşındı")
-                    st.warning("Fayl ehtiyat nüsxəyə köçürüldü!")
+                    st.warning("Fayl ehtiyat nüsxəyə köçürüldü.")
                     st.rerun()
         else:
             st.info("Bulud saxlancında fayl yoxdur.")
@@ -292,7 +292,7 @@ else:
         if st.button("Mesajı Göndər"):
             if msg_text.strip():
                 send_message(st.session_state.username, msg_text)
-                st.success("Mesaj göndərildi!")
+                st.success("Mesaj göndərildi.")
                 st.rerun()
 
         st.markdown("### Müraciətləriniz və Cavablar:")
@@ -300,7 +300,7 @@ else:
             df_m = pd.read_csv(MSG_FILE)
             user_msgs = df_m[df_m["Kimdən"] == st.session_state.username]
             if not user_msgs.empty:
-                st.dataframe(user_msgs[["Tarix", "Məzmun", "AdminCavabi"]], use_container_width=True)
+                st.dataframe(user_msgs[["Tarix", "Məzmun", "AdminCavabı"]], use_container_width=True)
 
     # 2. ADMIN PANELİ
     else:
