@@ -151,7 +151,7 @@ if not st.session_state.logged_in:
             else:
                 log_action(input_user if input_user else "Naməlum", "Kritik Təhlükə: Səlahiyyətsiz Giriş Cəhdi", f"Yanlış şifrə")
                 add_incident(f"Səlahiyyətsiz Giriş Cəhdi ({input_user})", "Səlahiyyət Pozuntusu", "Açıq", "IP izləndi və loglandı")
-                st.error("❌ İstifadəçi adı və ya şifrə yanlışdır!")
+                st.error("❌ İstifadəçi adı və ya şifrə yanlışdır.")
 
     with auth_tab2:
         st.subheader("Yeni İstifadəçi Hesabı Yarat")
@@ -188,7 +188,7 @@ if not st.session_state.logged_in:
 
 # ----------------- ƏSAS SİSTEM -----------------
 else:
-    st.sidebar.title(f"🛡️ Xoş gəldin, {st.session_state.username}")
+    st.sidebar.title(f"✨ Xoş gəldiniz, {st.session_state.username}✨")
     st.sidebar.write(f"Rol: **{st.session_state.role}**")
     
     if st.sidebar.button("🚪 Sistemdən Çıxış (Logout)"):
