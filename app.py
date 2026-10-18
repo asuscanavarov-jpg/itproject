@@ -104,7 +104,7 @@ def save_file_hash(filename, username, file_bytes):
 
 def check_password_strength(password):
     if len(password) < 6:
-        return "Şifrə ən azı 6 simvoldan ibarət olmalıdır!"
+        return "Şifrə ən azı 6 simvoldan ibarət olmalıdır."
     if not re.search(r"[A-Za-z]", password):
         return "Şifrədə mütləq hərflər olmalıdır!"
     if not re.search(r"\d", password):
@@ -155,7 +155,7 @@ if not st.session_state.logged_in:
 
     with auth_tab2:
         st.subheader("Yeni İstifadəçi Hesabı Yarat")
-        st.info("💡 Şifrədə ən azı 6 simvol, hərf, rəqəm və xüsusi simvol (!@#$...) olmalıdır!")
+        st.info("💡 Şifrədə ən azı 6 simvol, hərf, rəqəm və xüsusi simvol (!@#$...) olmalıdır.")
         
         new_user = st.text_input("Yeni İstifadəçi Adı:", key="signup_user")
         new_pass = st.text_input("Yeni Şifrə:", type="password", key="signup_pass")
@@ -166,9 +166,9 @@ if not st.session_state.logged_in:
             error_message = check_password_strength(new_pass)
 
             if not new_user.strip() or not new_pass.strip():
-                st.error("Bütün xanaları doldurun!")
+                st.error("Bütün xanaları doldurun.")
             elif new_user in df_users["Username"].values:
-                st.error("Bu istifadəçi adı artıq mövcuddur!")
+                st.error("Bu istifadəçi adı artıq mövcuddur.")
             elif error_message:
                 st.error(f"❌ Zəif Şifrə Siyasəti: {error_message}")
             elif new_pass != new_pass_confirm:
@@ -199,7 +199,6 @@ else:
         st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.info("Anti-Spam & Rate Limiting Cloud Platform.")
 
     # 1. İŞÇİ PANELİ
     if st.session_state.role == "İşçi (User)":
